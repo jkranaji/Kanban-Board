@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Board</title>
+
+    <script src="https://unpkg.com/react/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+
+        select {
+            width: auto;
+        }
+    </style>
+
+    <!-- Firebase Configuration -->
+    <script>
+      
+      const firebaseConfig = {
+        apiKey: "AIzaSyCbNGF6OJ3fwmU2-uCSq6PgUUxr7wudnC0",
+        authDomain: "kanban-board-eb467.firebaseapp.com",
+        databaseURL: "https://kanban-board-eb467-default-rtdb.firebaseio.com",
+        projectId: "kanban-board-eb467",
+        storageBucket: "kanban-board-eb467.appspot.com",
+        messagingSenderId: "364940477754",
+        appId: "1:364940477754:web:7169653896c8107c1ffc03"
+      };
+    
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const App = () => {
+            const [showForm, setShowForm] = useState(false);
+            const [editTask, setEditTask] = useState(null);
+            const [tasks, setTasks] = useState([]);
+            
+            useEffect(() => {
+                const tasksRef = database.ref('tasks');
+                tasksRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    const loadedTasks = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+                    setTasks(loadedTasks);
+                });
+            }, []);
+
+            // Create task
+            const handleCreateTask = (e) => {
+                e.preventDefault();
+                const newTask = {
+                    status: e.target.status.value,
+                    priority: e.target.priority.value,
+                    title: e.target.title.value,
+                    description: e.target.description.value,
+                    date: e.target.date.value
+                };
+
+                database.ref('tasks').push(newTask);
+                setShowForm(false);
+            };
+            // Edit task
+            const handleEditTask = (e) => {
+                e.preventDefault();
+                const updatedTask = {
+                    status: e.target.status.value,
+                    priority: e.target.priority.value,
+                    title: e.target.title.value,
+                    description: e.target.description.value,
+                    date: e.target.date.value
+                };
+
+                database.ref('tasks/' + editTask.id).set(updatedTask);
+                setEditTask(null);
+                setShowForm(false);
+            };
+            // Delete task
+            const handleDeleteTask = (id) => {
+                database.ref('tasks/' + id).remove();
+            };
+
+            const onDragStart = (e, id) => {
+                e.dataTransfer.setData("id", id);
+            };
+
+            const onDrop = (e, status) => {
+                const id = e.dataTransfer.getData("id");
+                const updatedTask = tasks.find(task => task.id === id);
+                if (updatedTask) {
+                    updatedTask.status = status;
+                    database.ref('tasks/' + id).set(updatedTask);
+                }
+            };
+
+            const onDragOver = (e) => {
+                e.preventDefault();
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100 p-4 md:p-8">
+                    <div className="bg-white p-4 md:p-6 rounded-lg shadow-md">
+                        <div className="flex justify-between items-center mb-4 md:mb-6">
+                            <h1 className="text-xl md:text-2xl font-bold">Kanban Board - Task Management App</h1>
+                            <button onClick={() => setShowForm(true)} className="bg-purple-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg">Create Task</button>
+                        </div>
+                        {showForm && (
+                            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                                <div className="bg-white p-4 md:p-6 rounded-lg shadow-md w-11/12 md:w-1/3">
+                                    <h2 className="text-lg md:text-xl font-bold mb-4">{editTask ? 'Edit Task' : 'Create Task'}</h2>
+                                    <form onSubmit={editTask ? handleEditTask : handleCreateTask}>
+                                        <div className="mb-4">
+                                            <label className="block text-gray-700">Title</label>
+                                            <input type="text" name="title" defaultValue={editTask ? editTask.title : ''} className="w-full border border-gray-300 rounded px-3 py-2" required />
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-gray-700">Description</label>
+                                            <textarea name="description" defaultValue={editTask ? editTask.description : ''} className="w-full border border-gray-300 rounded px-3 py-2" required></textarea>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-gray-700">Start Date</label>
+                                            <input type="date" name="date" defaultValue={editTask ? editTask.date : ''} className="w-full border border-gray-300 rounded px-3 py-2" required />
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-gray-700">Status</label>
+                                            <select name="status" defaultValue={editTask ? editTask.status : 'TODO'} className="w-full border border-gray-300 rounded px-3 py-2" required>
+                                                <option value="TODO">TODO</option>
+                                                <option value="IN PROGRESS">IN PROGRESS</option>
+                                                <option value="COMPLETED">COMPLETED</option>
+                                            </select>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-gray-700">Priority</label>
+                                            <select name="priority" defaultValue={editTask ? editTask.priority : 'High'} className="w-full border border-gray-300 rounded px-3 py-2" required>
+                                                <option value="High">High</option>
+                                                <option value="Medium">Medium</option>
+                                                <option value="Low">Low</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <button type="button" onClick={() => { setShowForm(false); setEditTask(null); }} className="bg-gray-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg mr-2">Cancel</button>
+                                            <button type="submit" className="bg-purple-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg">{editTask ? 'Update' : 'Create'}</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                            {['TODO', 'IN PROGRESS', 'COMPLETED'].map(status => (
+                                <div key={status} className="bg-white p-4 rounded-lg shadow-md" onDragOver={onDragOver} onDrop={(e) => onDrop(e, status)}>
+                                    <h2 className={`text-center text-white py-2 rounded-t-lg ${status === 'TODO' ? 'bg-purple-500' : status === 'IN PROGRESS' ? 'bg-yellow-500' : 'bg-green-500'}`}>{status}</h2>
+                                    <div className="p-4">
+                                        {tasks.filter(task => task.status === status).map(task => (
+                                            <div key={task.id} className={`bg-white p-4 rounded-lg shadow-md mb-4 border-l-4 ${task.status === 'TODO' ? 'border-purple-500' : task.status === 'IN PROGRESS' ? 'border-yellow-500' : 'border-green-500'}`} draggable onDragStart={(e) => onDragStart(e, task.id)}>
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className={`px-2 py-1 rounded ${task.priority === 'High' ? 'bg-red-200 text-red-600' : task.priority === 'Medium' ? 'bg-pink-200 text-pink-600' : 'bg-green-200 text-green-600'}`}>{task.priority}</span>
+                                                    <select className="border border-gray-300 rounded px-2 py-1" defaultValue={task.status} onChange={(e) => setTasks(tasks.map(t => t.id === task.id ? { ...t, status: e.target.value } : t))}>
+                                                        <option value="TODO">TODO</option>
+                                                        <option value="IN PROGRESS">IN PROGRESS</option>
+                                                        <option value="COMPLETED">COMPLETED</option>
+                                                    </select>
+                                                </div>
+                                                <h3 className={`text-lg font-bold ${status === 'TODO' ? 'text-purple-700' : status === 'IN PROGRESS' ? 'text-yellow-700' : 'text-green-700'}`}>{task.title}</h3>
+                                                <p className="text-gray-600 mb-4">{task.description}</p>
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <div className="flex items-center text-gray-500">
+                                                        <i className="far fa-calendar-alt mr-2"></i>
+                                                        <span>{task.date}</span>
+                                                    </div>
+                                                    <div className="flex">
+                                                        <button onClick={() => { setEditTask(task); setShowForm(true); }} className="bg-blue-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg mr-2">Edit</button>
+                                                        <button onClick={() => handleDeleteTask(task.id)} className="bg-red-500 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg">Delete</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+
+</html>
